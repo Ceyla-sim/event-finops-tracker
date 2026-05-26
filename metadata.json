@@ -1,0 +1,6 @@
+{
+  "name": "Techno Financial Dashboard",
+  "description": "Dashboard financier et de trésorerie pour organisateurs de soirées techno à Paris.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

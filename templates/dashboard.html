@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="fr" class="h-full bg-gray-950">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dyketopia - Treso Optimizer & Financial Dashboard</title>
+    <!-- Bootstrap 5 CSS CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons CDN via Unpkg -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Plotly.js Core CDN (Garantit que les graphiques Plotly fonctionnent) -->
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #030712; /* Extreme Slate Dark bg */
+            color: #f3f4f6;
+        }
+        .font-mono {
+            font-family: 'JetBrains Mono', monospace;
+        }
+        .card-custom {
+            background-color: #111827; /* Tailwind gray-900 */
+            border: 1px solid #1f2937; /* Tailwind gray-800 */
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+        }
+        .accent-purple {
+            color: #a78bfa;
+        }
+        .border-gradient-warning {
+            border-left: 5px solid #ef4444; /* Alert Red */
+        }
+        .border-gradient-success {
+            border-left: 5px solid #10b981; /* Success Green */
+        }
+        .border-gradient-info {
+            border-left: 5px solid #3b82f6; /* Info Blue */
+        }
+        .table-custom th {
+            font-weight: 600;
+            text-transform: uppercase;
+            font-size: 0.75rem;
+            letter-spacing: 0.05em;
+            background-color: #1f2937 !important;
+            color: #9ca3af !important;
+            border-bottom: 2px solid #374151 !important;
+        }
+        .table-custom td {
+            background-color: #111827 !important;
+            color: #f3f4f6 !important;
+            border-bottom: 1px solid #1f2937 !important;
+            vertical-align: middle;
+        }
+        .btn-techno {
+            background-color: #8b5cf6;
+            color: #ffffff;
+            font-weight: 600;
+            border: none;
+            transition: all 0.2s ease-in-out;
+        }
+        .btn-techno:hover {
+            background-color: #7c3aed;
+            transform: translateY(-1px);
+        }
+    </style>
+</head>
+<body class="h-full py-5">
+    <div class="container mb-5">
+        
+        <!-- En-tête de page -->
+        <header class="d-flex flex-column flex-md-row justify-content-between align-items-center mb-5 pb-4 border-bottom border-secondary">
+            <div>
+                <span class="badge bg-danger text-uppercase font-mono mb-2 px-2 py-1 tracking-wider">Plan de Redressement</span>
+                <h1 class="fw-extrabold tracking-tight d-flex align-items-center">
+                    <i data-lucide="activity" class="me-3 accent-purple" style="width: 38px; height: 38px;"></i>
+                    Techno Treso Optimizer <span class="text-muted fs-4 ms-2">| Paris</span>
+                </h1>
+                <p class="text-muted mb-0">Cockpit d'analyse de rentabilité et d'estimation de Runway pour organisateurs d'événements techno.</p>
+            </div>
+            
+            <!-- Zone d'Importation / Téléchargement CSV -->
+            <div class="mt-4 mt-md-0">
+                <form action="/" method="POST" enctype="multipart/form-data" class="d-flex gap-2">
+                    <div class="input-group">
+                        <input type="file" name="file" class="form-control bg-dark text-white border-secondary font-mono" id="file" accept=".csv" required>
+                        <button type="submit" class="btn btn-techno d-flex align-items-center gap-1">
+                            <i data-lucide="upload" style="width: 16px; height: 16px;"></i>
+                            Importer treso.csv
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </header>
+
+        <!-- Affichage d'alertes Flash de Flask -->
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                {% for category, message in messages %}
+                    <div class="alert alert-{{ category }} alert-dismissible fade show bg-dark border-{{ category }} text-white" role="alert">
+                        <div class="d-flex align-items-center gap-2">
+                            <i data-lucide="{{ 'check-circle' if category == 'success' else 'alert-triangle' }}"></i>
+                            <span>{{ message }}</span>
+                        </div>
+                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="alert" aria-label="Close"></button>
+                    </div>
+                {% endfor %}
+            {% endif %}
+        {% endwith %}
+
+        <!-- Si erreur lors du chargement -->
+        {% if error %}
+            <div class="card card-custom border-gradient-warning p-4 my-4">
+                <div class="d-flex align-items-start gap-3">
+                    <i data-lucide="alert-octagon" class="text-danger mt-1" style="width: 32px; height: 32px;"></i>
+                    <div>
+                        <h4 class="text-danger fw-bold">Impossible de générer le Dashboard</h4>
+                        <p class="text-muted">{{ error }}</p>
+                        <p class="text-white-50">Veuillez vérifier que le fichier comporte l'en-tête de colonnes attendu. Vous pouvez charger le modèle par défaut ou déposer votre fichier bancaire <strong>treso.csv</strong> dans le dossier racine.</p>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+        {% if kpis %}
+            <!-- Alerte de Diagnostic Analyste financier -->
+            <div class="card card-custom border-gradient-warning p-4 mb-5">
+                <div class="d-flex align-items-start gap-3 flex-column flex-md-row">
+                    <div class="bg-danger bg-opacity-25 p-2 rounded">
+                        <i data-lucide="trending-down" class="text-danger" style="width: 32px; height: 32px;"></i>
+                    </div>
+                    <div class="flex-grow-1">
+                        <h5 class="text-danger fw-bold mb-1">Diagnostic Senior Business Data Analyst</h5>
+                        {% if kpis.resultat_global < 0 %}
+                            <p class="mb-2"><strong>DANGER DE LIQUIDATION :</strong> Vos coûts opérationnels (notamment les bookings d'artistes internationaux et les locations de salles) dépassent l'apport cumulé de vos billetteries (Shotgun/RA) et des recettes du bar. Votre solde global affiche un déficit de <strong class="text-danger">{{ "{:,.2f}".format(kpis.resultat_global) }} €</strong> sur la période analysée.</p>
+                            <p class="fs-6 text-warning mb-0"><i data-lucide="zap" class="d-inline-block me-1 align-middle"></i> <strong>Stratégie recommandée :</strong> Négociez de meilleures conditions de coproduction (coprod) avec les clubs partenaires au lieu de payer des loyers secs exorbitants, réduisez l'enveloppe budgétaire des têtes d'affiche internationales de 30% au profit de pointures locales à plus forte marge, et optimisez vos recettes de bar par des tokenizations exclusives.</p>
+                        {% else %}
+                            <p class="mb-2"><strong>TENTATIVE DE STABILISATION :</strong> Votre structure enregistre un résultat global positif de <strong class="text-success">{{ "{:,.2f}".format(kpis.resultat_global) }} €</strong> sur la période, mais restez vigilant. L'équilibre reste précaire par rapport à la volatilité de vos charges par projet (bookings récents très élevés).</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Grilles de KPIs (Indicateurs Cruciaux) -->
+            <div class="row g-4 mb-5">
+                <!-- KPI 1 : Solde Actuel -->
+                <div class="col-md-3">
+                    <div class="card card-custom border-gradient-info p-4 h-100 d-flex flex-column justify-content-between">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <p class="text-muted small text-uppercase mb-1">Trésorerie Actuelle</p>
+                                <h3 class="fw-bold font-mono text-info mb-0">{{ "{:,.2f}".format(kpis.solde_actuel) }} €</h3>
+                            </div>
+                            <div class="bg-info bg-opacity-10 p-2 rounded text-info">
+                                <i data-lucide="wallet" style="width: 20px; height: 20px;"></i>
+                            </div>
+                        </div>
+                        <p class="text-muted small mt-3 mb-0">Solde réel détecté lors de la dernière transaction.</p>
+                    </div>
+                </div>
+
+                <!-- KPI 2 : Burn Rate Moyen -->
+                <div class="col-md-3">
+                    <div class="card card-custom border-gradient-warning p-4 h-100 d-flex flex-column justify-content-between">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <p class="text-muted small text-uppercase mb-1">Burn Rate Mensuel</p>
+                                <h3 class="fw-bold font-mono text-danger mb-0">{{ "{:,.2f}".format(kpis.burn_rate_moyen) }} €</h3>
+                            </div>
+                            <div class="bg-danger bg-opacity-10 p-2 rounded text-danger">
+                                <i data-lucide="flame" style="width: 20px; height: 20px;"></i>
+                            </div>
+                        </div>
+                        <p class="text-muted small mt-3 mb-0">Moyenne des sorties d'argent (Débits) par mois.</p>
+                    </div>
+                </div>
+
+                <!-- KPI 3 : Cash Flow Moyen -->
+                <div class="col-md-3">
+                    <div class="card card-custom p-4 h-100 d-flex flex-column justify-content-between {{ 'border-gradient-success' if kpis.flux_net_moyen >= 0 else 'border-gradient-warning' }}">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <p class="text-muted small text-uppercase mb-1">Flux Net Mensuel Moyen</p>
+                                <h3 class="fw-bold font-mono mb-0 {{ 'text-success' if kpis.flux_net_moyen >= 0 else 'text-danger' }}">
+                                    {{ "{:,.2f}".format(kpis.flux_net_moyen) }} €
+                                </h3>
+                            </div>
+                            <div class="bg-opacity-10 p-2 rounded {{ 'bg-success text-success' if kpis.flux_net_moyen >= 0 else 'bg-danger text-danger' }}">
+                                <i data-lucide="arrow-left-right" style="width: 20px; height: 20px;"></i>
+                            </div>
+                        </div>
+                        <p class="text-muted small mt-3 mb-0">Moyenne récente des profits ou pertes nets par mois.</p>
+                    </div>
+                </div>
+
+                <!-- KPI 4 : Runway Estimé -->
+                <div class="col-md-3">
+                    <div class="card card-custom p-4 h-100 d-flex flex-column justify-content-between {{ 'border-gradient-success' if kpis.runway_mois == float('inf') else 'border-gradient-warning' }}">
+                        <div class="d-flex justify-content-between align-items-start">
+                            <div>
+                                <p class="text-muted small text-uppercase mb-1">Runway (Espérance de vie)</p>
+                                <h3 class="fw-bold font-mono mb-0 {{ 'text-success' if kpis.runway_mois == float('inf') else 'text-warning' }}">
+                                    {% if kpis.runway_mois == float('inf') %}
+                                        Illimitée ⚙️
+                                    {% else %}
+                                        {{ "{:.1f}".format(kpis.runway_mois) }} Mois
+                                    {% endif %}
+                                </h3>
+                            </div>
+                            <div class="bg-opacity-10 p-2 rounded {{ 'bg-success text-success' if kpis.runway_mois == float('inf') else 'bg-warning text-warning' }}">
+                                <i data-lucide="hourglass" style="width: 20px; height: 20px;"></i>
+                            </div>
+                        </div>
+                        <p class="text-muted small mt-3 mb-0">Mois d'activité restants avant faillite, à structure de coûts constante.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Graphiques Interactifs Plotly -->
+            <div class="row g-4 mb-5">
+                <!-- Courbe de Vie -->
+                <div class="col-lg-12">
+                    <div class="card card-custom p-4">
+                        <div class="plotly-container">
+                            {{ graph_html.courbe_vie | safe }}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Cash Flow par Mois -->
+                <div class="col-lg-7">
+                    <div class="card card-custom p-4 h-100">
+                        <div class="plotly-container">
+                            {{ graph_html.cash_flow | safe }}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Répartition des Dépenses -->
+                <div class="col-lg-5">
+                    <div class="card card-custom p-4 h-100">
+                        <h5 class="fw-bold mb-3 d-flex align-items-center gap-2">
+                            <i data-lucide="pie-chart" class="accent-purple"></i> Répartition des Dépenses
+                        </h5>
+                        <div class="plotly-container">
+                            {{ graph_html.repartition_depenses | safe }}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Top 10 Prestataires -->
+                <div class="col-lg-12">
+                    <div class="card card-custom p-4">
+                        <div class="plotly-container">
+                            {{ graph_html.prestataires | safe }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- P&L par soirée (Analyse de la rentabilité par événement) -->
+            <div class="row g-4">
+                <div class="col-12">
+                    <div class="card card-custom p-4">
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center mb-4">
+                            <div>
+                                <h4 class="fw-bold mb-1 d-flex align-items-center">
+                                    <i data-lucide="dollar-sign" class="accent-purple me-2"></i>
+                                    Rentabilité par Soirée (P&L Analytique)
+                                </h4>
+                                <p class="text-muted small mb-0">Bilan des revenus de billetterie/bar par rapport aux frais opérationnels réels de chaque soirée.</p>
+                            </div>
+                            <span class="badge bg-purple font-mono mt-2 mt-md-0">Trié par performance financière</span>
+                        </div>
+                        
+                        <div class="table-responsive">
+                            <table class="table table-custom mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Événement</th>
+                                        <th class="text-end">Revenus (Billetterie + Bar)</th>
+                                        <th class="text-end">Coûts Opérationnels</th>
+                                        <th class="text-end">Marge Nette (EBITDA)</th>
+                                        <th class="text-center">ROI / Performance</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for row in pl_soirees %}
+                                        <tr>
+                                            <td class="fw-bold fs-6">
+                                                <div class="d-flex align-items-center gap-2">
+                                                    <i data-lucide="disc" class="text-muted" style="width: 14px; height: 14px;"></i>
+                                                    {{ row.evenement }}
+                                                </div>
+                                            </td>
+                                            <td class="text-end text-success font-mono">
+                                                +{{ "{:,.2f}".format(row.entrees) }} €
+                                            </td>
+                                            <td class="text-end text-danger font-mono">
+                                                -{{ "{:,.2f}".format(row.sorties) }} €
+                                            </td>
+                                            <td class="text-end font-mono fw-bold {{ 'text-success' if row.marge >= 0 else 'text-danger' }}">
+                                                {{ "{:,.2f}".format(row.marge) }} €
+                                            </td>
+                                            <td class="text-center">
+                                                {% if row.marge > 0 %}
+                                                    <span class="badge bg-success-subtle text-success border border-success font-mono px-2 py-1">
+                                                         Rentable (+{{ "{:.1f}".format(row.roi) }}%)
+                                                    </span>
+                                                {% else %}
+                                                    <span class="badge bg-danger-subtle text-danger border border-danger font-mono px-2 py-1">
+                                                         Déficitaire ({{ "{:.1f}".format(row.roi) }}%)
+                                                    </span>
+                                                {% endif %}
+                                            </td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+        <footer class="mt-5 pt-4 text-center border-top border-secondary text-muted small">
+            <p class="mb-0">Techno Treso Optimizer &copy; 2026. Conçu pour le redressement des structures culturelles indépendantes.</p>
+        </footer>
+    </div>
+
+    <!-- Bootstrap 5 JS Bundle CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Init Lucide icons
+        lucide.createIcons();
+    </script>
+</body>
+</html>
